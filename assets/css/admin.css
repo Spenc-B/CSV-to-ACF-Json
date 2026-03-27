@@ -1,0 +1,366 @@
+/* ==========================================================================
+   CSV to ACF JSON – Admin Styles
+   ========================================================================== */
+
+.ctaj-wrap {
+    max-width: 1100px;
+}
+
+.ctaj-description {
+    color: #646970;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+/* ----- Steps nav ----- */
+
+.ctaj-steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #c3c4c7;
+    padding-bottom: 0;
+}
+
+.ctaj-step {
+    flex: 1;
+    text-align: center;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #8c8f94;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: default;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.ctaj-step.active {
+    color: #2271b1;
+    border-bottom-color: #2271b1;
+}
+
+.ctaj-step.done {
+    color: #00a32a;
+    border-bottom-color: #00a32a;
+}
+
+.ctaj-step-num {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    border-radius: 50%;
+    background: #dcdcde;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: 6px;
+    text-align: center;
+}
+
+.ctaj-step.active .ctaj-step-num {
+    background: #2271b1;
+}
+
+.ctaj-step.done .ctaj-step-num {
+    background: #00a32a;
+}
+
+/* ----- Panels ----- */
+
+.ctaj-panel {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.ctaj-panel h2 {
+    margin-top: 0;
+    font-size: 18px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ----- Upload zone ----- */
+
+.ctaj-upload-zone {
+    border: 2px dashed #c3c4c7;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+}
+
+.ctaj-upload-zone:hover,
+.ctaj-upload-zone.drag-over {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+.ctaj-upload-zone .ctaj-upload-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.ctaj-upload-zone p {
+    color: #646970;
+    margin: 0 0 16px;
+}
+
+.ctaj-upload-zone input[type="file"] {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+}
+
+/* Upload options */
+.ctaj-upload-options {
+    margin-top: 16px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.ctaj-upload-options label {
+    font-size: 13px;
+    color: #50575e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ctaj-upload-options select {
+    max-width: 180px;
+}
+
+/* ----- Status messages ----- */
+
+.ctaj-status {
+    margin-top: 16px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.ctaj-status.ctaj-loading {
+    background: #f0f6fc;
+    color: #2271b1;
+    border: 1px solid #2271b1;
+}
+
+.ctaj-status.ctaj-success {
+    background: #edfaef;
+    color: #00a32a;
+    border: 1px solid #00a32a;
+}
+
+.ctaj-status.ctaj-error {
+    background: #fcf0f1;
+    color: #d63638;
+    border: 1px solid #d63638;
+}
+
+/* ----- Group settings ----- */
+
+.ctaj-group-settings {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.ctaj-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ctaj-setting-row:last-child {
+    margin-bottom: 0;
+}
+
+.ctaj-setting-row > label:first-child {
+    min-width: 200px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.ctaj-setting-row input[type="text"] {
+    flex: 1;
+    max-width: 400px;
+}
+
+.ctaj-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ctaj-toggle-label {
+    font-size: 13px;
+    color: #50575e;
+}
+
+.ctaj-location-rule {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ctaj-location-rule select,
+.ctaj-location-rule input {
+    max-width: 200px;
+}
+
+/* ----- Bulk actions ----- */
+
+.ctaj-bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.ctaj-bulk-actions label {
+    font-weight: 600;
+}
+
+.ctaj-sep {
+    color: #c3c4c7;
+    margin: 0 4px;
+}
+
+/* ----- Fields table ----- */
+
+#ctaj-fields-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+#ctaj-fields-table {
+    min-width: 900px;
+}
+
+#ctaj-fields-table th,
+#ctaj-fields-table td {
+    vertical-align: middle;
+    padding: 8px 10px;
+}
+
+.ctaj-col-num {
+    width: 40px;
+    text-align: center;
+    color: #8c8f94;
+}
+
+.ctaj-col-tab {
+    width: 130px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.ctaj-col-name {
+    width: 160px;
+}
+
+.ctaj-col-name code {
+    font-size: 12px;
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.ctaj-col-label input {
+    width: 100%;
+}
+
+.ctaj-col-type {
+    width: 160px;
+}
+
+.ctaj-col-type select {
+    width: 100%;
+}
+
+.ctaj-col-required {
+    width: 60px;
+    text-align: center;
+}
+
+.ctaj-col-instructions {
+    width: 200px;
+}
+
+.ctaj-col-instructions input {
+    width: 100%;
+    font-size: 12px;
+}
+
+.ctaj-col-actions {
+    width: 60px;
+    text-align: center;
+}
+
+/* ----- Sample data ----- */
+
+.ctaj-sample-scroll {
+    overflow-x: auto;
+    max-height: 250px;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+}
+
+#ctaj-sample-table th,
+#ctaj-sample-table td {
+    font-size: 12px;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ----- Step actions ----- */
+
+.ctaj-step-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #dcdcde;
+}
+
+/* ----- JSON preview ----- */
+
+.ctaj-json-preview {
+    background: #1d2327;
+    color: #50c878;
+    border-radius: 6px;
+    padding: 20px;
+    max-height: 500px;
+    overflow: auto;
+    margin-bottom: 16px;
+}
+
+.ctaj-json-preview pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 13px;
+    line-height: 1.6;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
