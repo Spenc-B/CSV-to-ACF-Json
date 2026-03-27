@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-03-27
+
+### Added
+- **Repeater field detection**: Numbered column patterns (e.g. `arg_1_intel`, `arg_2_ops`) are auto-detected and grouped into ACF Repeater fields with sub-fields
+- Repeater notice panel in Step 2 showing detected groups with sub-field details
+- "Break Apart" button to revert any mis-detected repeater back to flat fields
+- JSON generator produces valid ACF Repeater structure with `sub_fields`, `min`, `max`, table layout
+
 ## [1.3.0] - 2026-03-27
 
 ### Added
