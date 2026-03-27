@@ -446,3 +446,58 @@
     font-weight: 600;
     text-decoration: underline;
 }
+
+/* ----- Mode toggle ----- */
+
+.ctaj-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.ctaj-mode-btn {
+    min-width: 140px;
+}
+
+/* ----- Export mode ----- */
+
+.ctaj-export-mode {
+    margin-top: 8px;
+}
+
+.ctaj-export-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.ctaj-export-options {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin: 16px 0;
+    padding: 12px 16px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+}
+
+.ctaj-export-preview {
+    margin-top: 20px;
+}
+
+.ctaj-export-preview .ctaj-sample-scroll {
+    max-height: 300px;
+    overflow: auto;
+    margin-bottom: 16px;
+}
+
+.ctaj-row-label {
+    background: #f6f7f7;
+    white-space: nowrap;
+    min-width: 90px;
+}
+
+#ctaj-field-groups-list table {
+    margin-bottom: 16px;
+}
