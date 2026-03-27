@@ -11,6 +11,9 @@ class CTAJ_Admin_Page {
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
         add_action( 'wp_ajax_ctaj_upload_csv', [ $this, 'ajax_upload_csv' ] );
         add_action( 'wp_ajax_ctaj_generate_json', [ $this, 'ajax_generate_json' ] );
+        add_action( 'wp_ajax_ctaj_import_to_acf', [ $this, 'ajax_import_to_acf' ] );
+        add_action( 'wp_ajax_ctaj_json_to_csv', [ $this, 'ajax_json_to_csv' ] );
+        add_action( 'wp_ajax_ctaj_list_field_groups', [ $this, 'ajax_list_field_groups' ] );
     }
 
     public function add_menu_page() {
@@ -30,9 +33,12 @@ class CTAJ_Admin_Page {
         wp_enqueue_style( 'ctaj-admin', CTAJ_PLUGIN_URL . 'assets/css/admin.css', [], CTAJ_VERSION );
         wp_enqueue_script( 'ctaj-admin', CTAJ_PLUGIN_URL . 'assets/js/admin.js', [ 'jquery' ], CTAJ_VERSION, true );
         wp_localize_script( 'ctaj-admin', 'ctajData', [
-            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'ctaj_nonce' ),
+            'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+            'nonce'      => wp_create_nonce( 'ctaj_nonce' ),
             'fieldTypes' => self::get_acf_field_types(),
+            'acfActive'  => class_exists( 'ACF' ) || function_exists( 'acf_get_field_groups' ),
+            'acfEditUrl' => admin_url( 'post.php?action=edit&post=' ),
+            'exportNonce' => wp_create_nonce( 'ctaj_nonce' ),
         ] );
     }
 
@@ -91,7 +97,14 @@ class CTAJ_Admin_Page {
             <h1><?php esc_html_e( 'CSV to ACF JSON', 'csv-to-acf-json' ); ?></h1>
             <p class="ctaj-description"><?php esc_html_e( 'Upload a CSV file to generate an ACF Field Group JSON file. The column headers become field definitions.', 'csv-to-acf-json' ); ?></p>
 
+            <!-- Mode toggle -->
+            <div class="ctaj-mode-toggle">
+                <button type="button" class="button button-primary ctaj-mode-btn active" data-mode="import"><?php esc_html_e( 'CSV → ACF JSON', 'csv-to-acf-json' ); ?></button>
+                <button type="button" class="button ctaj-mode-btn" data-mode="export"><?php esc_html_e( 'ACF JSON → CSV', 'csv-to-acf-json' ); ?></button>
+            </div>
+
             <!-- Steps nav -->
+            <div class="ctaj-import-mode">
             <div class="ctaj-steps">
                 <div class="ctaj-step active" data-step="1"><span class="ctaj-step-num">1</span> Upload CSV</div>
                 <div class="ctaj-step" data-step="2"><span class="ctaj-step-num">2</span> Configure Fields</div>
@@ -204,10 +217,74 @@ class CTAJ_Admin_Page {
                 <div class="ctaj-json-preview">
                     <pre id="ctaj-json-output"></pre>
                 </div>
+                <div id="ctaj-import-status" class="ctaj-status hidden"></div>
+
                 <div class="ctaj-step-actions">
                     <button type="button" class="button" id="ctaj-back-2"><?php esc_html_e( '← Back to Configure', 'csv-to-acf-json' ); ?></button>
                     <button type="button" class="button button-primary" id="ctaj-download"><?php esc_html_e( 'Download JSON File', 'csv-to-acf-json' ); ?></button>
                     <button type="button" class="button" id="ctaj-copy-json"><?php esc_html_e( 'Copy to Clipboard', 'csv-to-acf-json' ); ?></button>
+                    <button type="button" class="button button-primary" id="ctaj-import-acf" style="display:none;"><?php esc_html_e( 'Import Directly to ACF', 'csv-to-acf-json' ); ?></button>
+                </div>
+            </div>
+            </div><!-- .ctaj-import-mode -->
+
+            <!-- Export mode: ACF JSON → CSV -->
+            <div class="ctaj-export-mode hidden">
+                <h2><?php esc_html_e( 'ACF JSON → CSV Export', 'csv-to-acf-json' ); ?></h2>
+                <p class="ctaj-description"><?php esc_html_e( 'Upload an ACF JSON export file or select an existing field group, then download a CSV that can be re-imported through Step 1.', 'csv-to-acf-json' ); ?></p>
+
+                <div class="ctaj-export-source">
+                    <div class="ctaj-export-tabs">
+                        <button type="button" class="button button-primary ctaj-export-tab active" data-tab="upload"><?php esc_html_e( 'Upload JSON File', 'csv-to-acf-json' ); ?></button>
+                        <?php if ( class_exists( 'ACF' ) || function_exists( 'acf_get_field_groups' ) ) : ?>
+                            <button type="button" class="button ctaj-export-tab" data-tab="existing"><?php esc_html_e( 'Select Existing Field Group', 'csv-to-acf-json' ); ?></button>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Upload JSON sub-tab -->
+                    <div class="ctaj-export-panel" id="ctaj-export-upload">
+                        <div class="ctaj-upload-zone" id="ctaj-json-drop-zone">
+                            <div class="ctaj-upload-icon">📋</div>
+                            <p><?php esc_html_e( 'Drag & drop an ACF JSON export file here, or click to browse', 'csv-to-acf-json' ); ?></p>
+                            <input type="file" id="ctaj-json-file-input" accept=".json" />
+                            <button type="button" class="button button-primary" id="ctaj-json-browse-btn"><?php esc_html_e( 'Choose JSON File', 'csv-to-acf-json' ); ?></button>
+                        </div>
+                    </div>
+
+                    <!-- Existing field groups sub-tab -->
+                    <div class="ctaj-export-panel hidden" id="ctaj-export-existing">
+                        <div id="ctaj-field-groups-list">
+                            <p class="ctaj-loading-text"><?php esc_html_e( 'Loading field groups…', 'csv-to-acf-json' ); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ctaj-export-options">
+                    <label>
+                        <input type="checkbox" id="ctaj-export-include-categories" checked />
+                        <?php esc_html_e( 'Include category/tab row (row 1)', 'csv-to-acf-json' ); ?>
+                    </label>
+                    <label>
+                        <?php esc_html_e( 'Delimiter:', 'csv-to-acf-json' ); ?>
+                        <select id="ctaj-export-delimiter">
+                            <option value=","><?php esc_html_e( 'Comma (,)', 'csv-to-acf-json' ); ?></option>
+                            <option value="	"><?php esc_html_e( 'Tab', 'csv-to-acf-json' ); ?></option>
+                            <option value=";"><?php esc_html_e( 'Semicolon (;)', 'csv-to-acf-json' ); ?></option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="ctaj-export-status" class="ctaj-status hidden"></div>
+
+                <div class="ctaj-export-preview hidden" id="ctaj-export-preview">
+                    <h3><?php esc_html_e( 'CSV Preview', 'csv-to-acf-json' ); ?></h3>
+                    <div class="ctaj-sample-scroll">
+                        <table class="wp-list-table widefat fixed striped" id="ctaj-export-preview-table"></table>
+                    </div>
+                    <div class="ctaj-step-actions">
+                        <button type="button" class="button button-primary" id="ctaj-export-download"><?php esc_html_e( 'Download CSV', 'csv-to-acf-json' ); ?></button>
+                        <button type="button" class="button" id="ctaj-export-copy"><?php esc_html_e( 'Copy to Clipboard', 'csv-to-acf-json' ); ?></button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -287,6 +364,13 @@ class CTAJ_Admin_Page {
             $resolved_categories[ $i ] = $last_cat;
         }
 
+        // Collect ALL data rows (not just sample) for unique value extraction.
+        if ( $has_category_row && count( $lines ) >= 2 ) {
+            $all_data_rows = array_slice( $lines, 2 );
+        } else {
+            $all_data_rows = array_slice( $lines, 1 );
+        }
+
         // Build fields array.
         $fields = [];
         foreach ( $field_names as $i => $name ) {
@@ -294,13 +378,25 @@ class CTAJ_Admin_Page {
             if ( $name === '' ) {
                 continue;
             }
+
+            $unique_values = self::extract_unique_values( $i, $all_data_rows );
+            $guessed_type  = self::guess_field_type( $name, $i, $sample_data );
+
+            // If there are a small number of unique non-empty values, suggest select.
+            $choices = [];
+            if ( count( $unique_values ) >= 2 && count( $unique_values ) <= 15 && ! in_array( $guessed_type, [ 'url', 'email', 'image', 'file', 'wysiwyg', 'textarea', 'date_picker', 'color_picker', 'google_map' ], true ) ) {
+                $guessed_type = 'select';
+                $choices      = $unique_values;
+            }
+
             $fields[] = [
                 'index'    => $i,
                 'name'     => sanitize_title( str_replace( ' ', '_', $name ) ),
                 'label'    => self::name_to_label( $name ),
                 'raw_name' => sanitize_text_field( $name ),
                 'category' => isset( $resolved_categories[ $i ] ) ? sanitize_text_field( $resolved_categories[ $i ] ) : '',
-                'type'     => self::guess_field_type( $name, $i, $sample_data ),
+                'type'     => $guessed_type,
+                'choices'  => array_map( 'sanitize_text_field', $choices ),
             ];
         }
 
@@ -359,6 +455,15 @@ class CTAJ_Admin_Page {
             if ( empty( $f['include'] ) ) {
                 continue;
             }
+            $choices_raw = isset( $f['choices'] ) && is_array( $f['choices'] ) ? $f['choices'] : [];
+            $choices = [];
+            foreach ( $choices_raw as $c ) {
+                $c = sanitize_text_field( $c );
+                if ( $c !== '' ) {
+                    $choices[ $c ] = $c;
+                }
+            }
+
             $config['fields'][] = [
                 'name'         => sanitize_title( str_replace( ' ', '_', $f['name'] ) ),
                 'label'        => sanitize_text_field( $f['label'] ),
@@ -366,6 +471,7 @@ class CTAJ_Admin_Page {
                 'required'     => ! empty( $f['required'] ) ? 1 : 0,
                 'instructions' => sanitize_textarea_field( $f['instructions'] ?? '' ),
                 'category'     => sanitize_text_field( $f['category'] ?? '' ),
+                'choices'      => $choices,
             ];
         }
 
@@ -373,6 +479,228 @@ class CTAJ_Admin_Page {
         $json      = $generator->generate( $config );
 
         wp_send_json_success( [ 'json' => $json ] );
+    }
+
+    public function ajax_import_to_acf() {
+        // Nonce comes via query string since body is JSON.
+        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['nonce'] ) ), 'ctaj_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Security check failed.', 'csv-to-acf-json' ) ] );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Unauthorized.', 'csv-to-acf-json' ) ] );
+        }
+
+        if ( ! function_exists( 'acf_import_field_group' ) ) {
+            wp_send_json_error( [ 'message' => __( 'ACF is not active. Please activate Advanced Custom Fields first.', 'csv-to-acf-json' ) ] );
+        }
+
+        $raw_input = file_get_contents( 'php://input' );
+        $input     = json_decode( $raw_input, true );
+
+        if ( ! $input || empty( $input['fieldGroup'] ) || ! is_array( $input['fieldGroup'] ) ) {
+            wp_send_json_error( [ 'message' => __( 'No field group data provided.', 'csv-to-acf-json' ) ] );
+        }
+
+        $field_group = $input['fieldGroup'];
+
+        // Check for existing field group with same key.
+        $existing = acf_get_field_group( $field_group['key'] );
+        if ( $existing ) {
+            wp_send_json_error( [
+                'message' => sprintf(
+                    __( 'A field group with key "%s" already exists (ID: %d). Delete it first or generate a new JSON to get a fresh key.', 'csv-to-acf-json' ),
+                    esc_html( $field_group['key'] ),
+                    $existing['ID']
+                ),
+            ] );
+        }
+
+        $imported = acf_import_field_group( $field_group );
+
+        if ( ! $imported || empty( $imported['ID'] ) ) {
+            wp_send_json_error( [ 'message' => __( 'ACF import failed. Please try downloading the JSON and importing manually.', 'csv-to-acf-json' ) ] );
+        }
+
+        wp_send_json_success( [
+            'message' => sprintf( __( 'Field group "%s" imported successfully!', 'csv-to-acf-json' ), esc_html( $field_group['title'] ) ),
+            'postId'  => $imported['ID'],
+            'editUrl' => admin_url( 'post.php?action=edit&post=' . $imported['ID'] ),
+        ] );
+    }
+
+    /**
+     * AJAX: List existing ACF field groups.
+     */
+    public function ajax_list_field_groups() {
+        check_ajax_referer( 'ctaj_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Unauthorized.', 'csv-to-acf-json' ) ] );
+        }
+
+        if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+            wp_send_json_error( [ 'message' => __( 'ACF is not active.', 'csv-to-acf-json' ) ] );
+        }
+
+        $groups = acf_get_field_groups();
+        $result = [];
+
+        foreach ( $groups as $group ) {
+            $result[] = [
+                'key'   => $group['key'],
+                'title' => $group['title'],
+                'id'    => $group['ID'],
+            ];
+        }
+
+        wp_send_json_success( [ 'groups' => $result ] );
+    }
+
+    /**
+     * AJAX: Convert ACF JSON to CSV.
+     */
+    public function ajax_json_to_csv() {
+        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['nonce'] ) ), 'ctaj_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Security check failed.', 'csv-to-acf-json' ) ] );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Unauthorized.', 'csv-to-acf-json' ) ] );
+        }
+
+        $raw_input = file_get_contents( 'php://input' );
+        $input     = json_decode( $raw_input, true );
+
+        if ( ! $input ) {
+            wp_send_json_error( [ 'message' => __( 'Invalid request data.', 'csv-to-acf-json' ) ] );
+        }
+
+        $field_group = null;
+
+        // Source: uploaded JSON or existing field group key.
+        if ( ! empty( $input['fieldGroup'] ) && is_array( $input['fieldGroup'] ) ) {
+            $field_group = $input['fieldGroup'];
+        } elseif ( ! empty( $input['groupKey'] ) && function_exists( 'acf_get_field_group' ) && function_exists( 'acf_get_fields' ) ) {
+            $group_key = sanitize_text_field( $input['groupKey'] );
+            $group     = acf_get_field_group( $group_key );
+            if ( ! $group ) {
+                wp_send_json_error( [ 'message' => __( 'Field group not found.', 'csv-to-acf-json' ) ] );
+            }
+            $fields = acf_get_fields( $group['key'] );
+            $field_group = $group;
+            $field_group['fields'] = $fields ?: [];
+        }
+
+        if ( ! $field_group || empty( $field_group['fields'] ) ) {
+            wp_send_json_error( [ 'message' => __( 'No fields found in the field group.', 'csv-to-acf-json' ) ] );
+        }
+
+        $include_categories = ! empty( $input['includeCategories'] );
+        $delimiter          = isset( $input['delimiter'] ) ? $input['delimiter'] : ',';
+        if ( ! in_array( $delimiter, [ ',', "\t", ';' ], true ) ) {
+            $delimiter = ',';
+        }
+
+        // Parse fields — separate tabs from real fields.
+        $current_tab = '';
+        $csv_fields  = [];
+
+        foreach ( $field_group['fields'] as $field ) {
+            if ( isset( $field['type'] ) && $field['type'] === 'tab' ) {
+                $current_tab = $field['label'] ?? '';
+                continue;
+            }
+
+            $choices_str = '';
+            if ( ! empty( $field['choices'] ) && is_array( $field['choices'] ) ) {
+                $choices_str = implode( ', ', array_values( $field['choices'] ) );
+            }
+
+            $csv_fields[] = [
+                'category'     => $current_tab,
+                'name'         => $field['name'] ?? '',
+                'label'        => $field['label'] ?? '',
+                'type'         => $field['type'] ?? 'text',
+                'required'     => ! empty( $field['required'] ) ? '1' : '0',
+                'instructions' => $field['instructions'] ?? '',
+                'choices'      => $choices_str,
+            ];
+        }
+
+        if ( empty( $csv_fields ) ) {
+            wp_send_json_error( [ 'message' => __( 'No exportable fields found.', 'csv-to-acf-json' ) ] );
+        }
+
+        // Build CSV rows.
+        $rows = [];
+        $has_categories = false;
+        foreach ( $csv_fields as $f ) {
+            if ( ! empty( $f['category'] ) ) {
+                $has_categories = true;
+                break;
+            }
+        }
+
+        // Category row (row 1) — only emit when there are tabs and user opted in.
+        if ( $include_categories && $has_categories ) {
+            $cat_row = [];
+            $last_cat = '';
+            foreach ( $csv_fields as $f ) {
+                // Only emit category name when it changes (mimics spanning).
+                if ( $f['category'] !== $last_cat ) {
+                    $cat_row[] = $f['category'];
+                    $last_cat  = $f['category'];
+                } else {
+                    $cat_row[] = '';
+                }
+            }
+            $rows[] = $cat_row;
+        }
+
+        // Field name row.
+        $name_row = [];
+        foreach ( $csv_fields as $f ) {
+            $name_row[] = $f['name'];
+        }
+        $rows[] = $name_row;
+
+        // Metadata rows: label, type, required, instructions, choices.
+        $label_row = [];
+        $type_row  = [];
+        $req_row   = [];
+        $instr_row = [];
+        $choice_row = [];
+
+        foreach ( $csv_fields as $f ) {
+            $label_row[]  = $f['label'];
+            $type_row[]   = $f['type'];
+            $req_row[]    = $f['required'];
+            $instr_row[]  = $f['instructions'];
+            $choice_row[] = $f['choices'];
+        }
+
+        $rows[] = $label_row;
+        $rows[] = $type_row;
+        $rows[] = $req_row;
+        $rows[] = $instr_row;
+        $rows[] = $choice_row;
+
+        // Generate CSV string.
+        $handle = fopen( 'php://temp', 'r+' );
+        foreach ( $rows as $row ) {
+            fputcsv( $handle, $row, $delimiter );
+        }
+        rewind( $handle );
+        $csv_content = stream_get_contents( $handle );
+        fclose( $handle );
+
+        wp_send_json_success( [
+            'csv'       => $csv_content,
+            'rows'      => $rows,
+            'fields'    => $csv_fields,
+            'groupTitle' => $field_group['title'] ?? 'exported',
+        ] );
     }
 
     /**
@@ -463,6 +791,22 @@ class CTAJ_Admin_Page {
         }
 
         return 'text';
+    }
+
+    /**
+     * Extract unique non-empty values for a column across all data rows.
+     */
+    private static function extract_unique_values( $col_index, $all_data_rows ) {
+        $values = [];
+        foreach ( $all_data_rows as $row ) {
+            if ( isset( $row[ $col_index ] ) ) {
+                $v = trim( $row[ $col_index ] );
+                if ( $v !== '' ) {
+                    $values[ $v ] = true;
+                }
+            }
+        }
+        return array_keys( $values );
     }
 
     private static function name_to_label( $name ) {
