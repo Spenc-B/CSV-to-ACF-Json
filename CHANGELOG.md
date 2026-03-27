@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-27
+
+### Added
+- **Import Directly to ACF**: One-click button on Step 3 imports the generated field group straight into ACF — no file download/upload needed
+- ACF active detection — import button only appears when ACF is installed and active
+- Duplicate key protection — prevents importing a field group that already exists
+- Direct edit link to the newly created field group after successful import
+
 ## [1.1.0] - 2026-03-27
 
 ### Added
