@@ -10,7 +10,7 @@ When a CSV column only contains a small set of unique values (e.g. 3-8 distinct 
 - Pass choices through to the JSON generator so they appear in the exported ACF field definition
 
 ## Acceptance Criteria
-- [ ] Unique values extracted during upload and returned to the JS
-- [ ] Fields with few unique values auto-set to `select` type with choices pre-filled
-- [ ] Choices editable in the configure step (add/remove/reorder)
-- [ ] Generated JSON includes `choices` array for select/radio/checkbox fields
+- [x] Unique values extracted during upload and returned to the JS
+- [x] Fields with few unique values auto-set to `select` type with choices pre-filled
+- [x] Choices editable in the configure step (add/remove/reorder)
+- [x] Generated JSON includes `choices` array for select/radio/checkbox fields
