@@ -382,4 +382,237 @@
         return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // ----- Mode toggle (Import / Export) -----
+
+    let exportCsvContent = '';
+
+    $('.ctaj-mode-btn').on('click', function () {
+        const mode = $(this).data('mode');
+        $('.ctaj-mode-btn').removeClass('button-primary active').addClass('button');
+        $(this).addClass('button-primary active').removeClass('button');
+
+        if (mode === 'import') {
+            $('.ctaj-import-mode').removeClass('hidden');
+            $('.ctaj-export-mode').addClass('hidden');
+        } else {
+            $('.ctaj-import-mode').addClass('hidden');
+            $('.ctaj-export-mode').removeClass('hidden');
+        }
+    });
+
+    // ----- Export: sub-tab toggle -----
+
+    $('.ctaj-export-tab').on('click', function () {
+        const tab = $(this).data('tab');
+        $('.ctaj-export-tab').removeClass('button-primary active').addClass('button');
+        $(this).addClass('button-primary active').removeClass('button');
+        $('.ctaj-export-panel').addClass('hidden');
+        $('#ctaj-export-' + tab).removeClass('hidden');
+
+        // Load existing field groups on first click.
+        if (tab === 'existing' && !$('#ctaj-field-groups-list').data('loaded')) {
+            loadFieldGroups();
+        }
+    });
+
+    // ----- Export: Upload JSON file -----
+
+    const $jsonDropZone = $('#ctaj-json-drop-zone');
+    const $jsonFileInput = $('#ctaj-json-file-input');
+
+    $('#ctaj-json-browse-btn').on('click', function () {
+        $jsonFileInput.trigger('click');
+    });
+
+    $jsonDropZone.on('dragover', function (e) {
+        e.preventDefault();
+        $(this).addClass('drag-over');
+    }).on('dragleave drop', function (e) {
+        e.preventDefault();
+        $(this).removeClass('drag-over');
+    }).on('drop', function (e) {
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length) {
+            $jsonFileInput[0].files = files;
+            handleJsonUpload(files[0]);
+        }
+    });
+
+    $jsonFileInput.on('change', function () {
+        if (this.files.length) {
+            handleJsonUpload(this.files[0]);
+        }
+    });
+
+    function handleJsonUpload(file) {
+        const $status = $('#ctaj-export-status');
+        $status.removeClass('hidden ctaj-error ctaj-success').addClass('ctaj-loading').text('Reading JSON file…');
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                let json = JSON.parse(e.target.result);
+                // ACF exports an array of field groups.
+                const fieldGroup = Array.isArray(json) ? json[0] : json;
+                if (!fieldGroup || !fieldGroup.fields) {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-error').text('Invalid ACF JSON — no fields found.');
+                    return;
+                }
+                convertJsonToCsv(fieldGroup);
+            } catch (err) {
+                $status.removeClass('ctaj-loading').addClass('ctaj-error').text('Failed to parse JSON: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ----- Export: Select existing field group -----
+
+    function loadFieldGroups() {
+        const $list = $('#ctaj-field-groups-list');
+        $list.html('<p class="ctaj-loading-text">Loading field groups…</p>');
+
+        $.ajax({
+            url: ctajData.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'ctaj_list_field_groups',
+                nonce: ctajData.nonce,
+            },
+            success: function (res) {
+                if (res.success && res.data.groups.length) {
+                    let html = '<table class="wp-list-table widefat fixed striped"><thead><tr><th>Field Group</th><th style="width:120px">Action</th></tr></thead><tbody>';
+                    res.data.groups.forEach(function (g) {
+                        html += '<tr><td>' + escHtml(g.title) + '</td><td><button type="button" class="button button-small ctaj-export-group-btn" data-key="' + escAttr(g.key) + '">' + 'Export' + '</button></td></tr>';
+                    });
+                    html += '</tbody></table>';
+                    $list.html(html).data('loaded', true);
+                } else if (res.success) {
+                    $list.html('<p>No field groups found.</p>');
+                } else {
+                    $list.html('<p class="ctaj-error">' + escHtml(res.data.message) + '</p>');
+                }
+            },
+            error: function () {
+                $list.html('<p class="ctaj-error">Network error loading field groups.</p>');
+            }
+        });
+    }
+
+    // Click handler for exporting an existing field group.
+    $(document).on('click', '.ctaj-export-group-btn', function () {
+        const $btn = $(this).prop('disabled', true).text('Loading…');
+        const groupKey = $(this).data('key');
+
+        const $status = $('#ctaj-export-status');
+        $status.removeClass('hidden ctaj-error ctaj-success').addClass('ctaj-loading').text('Converting field group…');
+
+        $.ajax({
+            url: ctajData.ajaxUrl + '?action=ctaj_json_to_csv&nonce=' + encodeURIComponent(ctajData.nonce),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                groupKey: groupKey,
+                includeCategories: $('#ctaj-export-include-categories').is(':checked'),
+                delimiter: $('#ctaj-export-delimiter').val(),
+            }),
+            success: function (res) {
+                $btn.prop('disabled', false).text('Export');
+                if (res.success) {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-success').text('CSV generated for "' + res.data.groupTitle + '"');
+                    showExportPreview(res.data);
+                } else {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-error').text(res.data.message || 'Export failed.');
+                }
+            },
+            error: function () {
+                $btn.prop('disabled', false).text('Export');
+                $status.removeClass('ctaj-loading').addClass('ctaj-error').text('Network error.');
+            }
+        });
+    });
+
+    // ----- Export: Convert uploaded JSON via AJAX -----
+
+    function convertJsonToCsv(fieldGroup) {
+        const $status = $('#ctaj-export-status');
+        $status.removeClass('hidden ctaj-error ctaj-success').addClass('ctaj-loading').text('Converting to CSV…');
+
+        $.ajax({
+            url: ctajData.ajaxUrl + '?action=ctaj_json_to_csv&nonce=' + encodeURIComponent(ctajData.nonce),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fieldGroup: fieldGroup,
+                includeCategories: $('#ctaj-export-include-categories').is(':checked'),
+                delimiter: $('#ctaj-export-delimiter').val(),
+            }),
+            success: function (res) {
+                if (res.success) {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-success').text('CSV generated for "' + res.data.groupTitle + '"');
+                    showExportPreview(res.data);
+                } else {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-error').text(res.data.message || 'Conversion failed.');
+                }
+            },
+            error: function () {
+                $status.removeClass('ctaj-loading').addClass('ctaj-error').text('Network error.');
+            }
+        });
+    }
+
+    // ----- Export: Show preview & enable download -----
+
+    function showExportPreview(data) {
+        exportCsvContent = data.csv;
+
+        const $preview = $('#ctaj-export-preview').removeClass('hidden');
+        const $table = $('#ctaj-export-preview-table').empty();
+
+        const rowLabels = [];
+        const hasCategories = data.rows.length >= 6;
+        if (hasCategories) {
+            rowLabels.push('Category', 'Field Name', 'Label', 'Type', 'Required', 'Instructions', 'Choices');
+        } else {
+            rowLabels.push('Field Name', 'Label', 'Type', 'Required', 'Instructions', 'Choices');
+        }
+
+        data.rows.forEach(function (row, idx) {
+            const $tr = $('<tr>');
+            const tag = idx === 0 ? 'th' : 'td';
+            const label = rowLabels[idx] || '';
+            $tr.append('<td class="ctaj-row-label"><strong>' + escHtml(label) + '</strong></td>');
+            row.forEach(function (cell) {
+                $tr.append('<' + tag + '>' + escHtml(cell || '') + '</' + tag + '>');
+            });
+            $table.append($tr);
+        });
+    }
+
+    // ----- Export: Download CSV -----
+
+    $('#ctaj-export-download').on('click', function () {
+        if (!exportCsvContent) return;
+        const blob = new Blob([exportCsvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'acf-field-group-export.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    // ----- Export: Copy CSV -----
+
+    $('#ctaj-export-copy').on('click', function () {
+        if (!exportCsvContent) return;
+        navigator.clipboard.writeText(exportCsvContent).then(function () {
+            const $btn = $('#ctaj-export-copy');
+            $btn.text('Copied!');
+            setTimeout(function () { $btn.text('Copy to Clipboard'); }, 2000);
+        });
+    });
+
 })(jQuery);
