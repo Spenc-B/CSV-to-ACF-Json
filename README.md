@@ -13,6 +13,7 @@ Instead of manually clicking through ACF's UI to create dozens of fields, upload
 - **Auto-detect field types**: Guesses field types from column names and sample data (e.g. `website` → URL, `email` → Email, `is_active` → True/False)
 - **Choice options from data**: When a column has 2–15 unique values, auto-detects it as a Select field with choices pre-populated. Choices are editable — add, remove, or switch to radio/checkbox
 - **Import Directly to ACF**: When ACF is active, a one-click import button appears on Step 3 — skip the download/upload and create the field group instantly. Includes duplicate protection and a direct edit link
+- **ACF JSON → CSV Export**: Reverse mode — upload an ACF JSON file or pick an existing field group and export a round-trip-compatible CSV. Tab fields become the category row, and metadata (label, type, required, instructions, choices) is included
 - **Full field type support**: All ACF field types with correct default properties
 - **Interactive configuration**: Rename labels, change types, toggle required, add instructions, include/exclude fields
 - **Bulk actions**: Apply a field type to all fields at once, or reset to auto-detected types

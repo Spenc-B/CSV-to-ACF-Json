@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-03-27
+
+### Added
+- **ACF JSON → CSV Export**: Reverse conversion mode — upload an ACF JSON file or select an existing field group and download a round-trip-compatible CSV
+- Mode toggle to switch between CSV→JSON (import) and JSON→CSV (export)
+- Export from existing ACF field groups when ACF is active
+- Tab fields converted to category row for seamless re-import
+- Metadata rows: field name, label, type, required, instructions, choices
+- CSV preview table, download, and copy to clipboard
+- Export options: include/exclude category row, delimiter selection
+
 ## [1.2.0] - 2026-03-27
 
 ### Added
