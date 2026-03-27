@@ -5,6 +5,7 @@
     let parsedFields = [];
     let sampleData = [];
     let generatedJson = null;
+    let repeaterGroups = [];
 
     // ----- Step navigation -----
 
@@ -72,6 +73,7 @@
                     );
                     parsedFields = res.data.fields;
                     sampleData = res.data.sampleData;
+                    repeaterGroups = res.data.repeaterGroups || [];
                     populateStep2();
                     setTimeout(function () { goToStep(2); }, 500);
                 } else {
@@ -203,6 +205,58 @@
             }
         });
 
+        // Repeater detection notice.
+        const $repeaterNotice = $('#ctaj-repeater-notice');
+        if (repeaterGroups.length) {
+            $repeaterNotice.removeClass('hidden');
+            const $list = $('#ctaj-repeater-groups').empty();
+            repeaterGroups.forEach(function (rg, rgIdx) {
+                const subFieldNames = rg.subFields.map(function (sf) { return sf.label; }).join(', ');
+                const $item = $(
+                    '<div class="ctaj-repeater-group" data-rg-index="' + rgIdx + '">' +
+                    '<div class="ctaj-repeater-header">' +
+                    '<span class="ctaj-repeater-icon">🔁</span> ' +
+                    '<strong>' + escHtml(rg.label) + '</strong>' +
+                    ' <span class="ctaj-repeater-meta">(' + rg.maxRows + ' rows, sub-fields: ' + escHtml(subFieldNames) + ')</span>' +
+                    ' <button type="button" class="button button-small ctaj-repeater-break" data-rg-index="' + rgIdx + '">Break Apart</button>' +
+                    '</div>' +
+                    '</div>'
+                );
+                $list.append($item);
+
+                // Mark the constituent flat fields as part of a repeater (hide them).
+                rg.fieldIndices.forEach(function (fi) {
+                    $body.find('tr[data-index="' + fi + '"]').addClass('ctaj-in-repeater').attr('data-repeater', rgIdx);
+                    $body.find('.ctaj-choices-row[data-parent="' + fi + '"]').addClass('ctaj-in-repeater');
+                });
+            });
+        } else {
+            $repeaterNotice.addClass('hidden');
+        }
+
+        // Break apart a repeater group.
+        $('#ctaj-repeater-groups').off('click', '.ctaj-repeater-break').on('click', '.ctaj-repeater-break', function () {
+            const rgIdx = parseInt($(this).data('rg-index'), 10);
+            const rg = repeaterGroups[rgIdx];
+            if (!rg) return;
+
+            // Show the flat fields again.
+            rg.fieldIndices.forEach(function (fi) {
+                $body.find('tr[data-index="' + fi + '"]').removeClass('ctaj-in-repeater').removeAttr('data-repeater');
+                $body.find('.ctaj-choices-row[data-parent="' + fi + '"]').removeClass('ctaj-in-repeater');
+            });
+
+            // Remove this group from the list.
+            repeaterGroups[rgIdx] = null;
+            $(this).closest('.ctaj-repeater-group').remove();
+
+            // Hide notice if no groups left.
+            const remaining = repeaterGroups.filter(function (g) { return g !== null; });
+            if (!remaining.length) {
+                $repeaterNotice.addClass('hidden');
+            }
+        });
+
         // Sample data table.
         if (sampleData.length) {
             const $sampleWrap = $('#ctaj-sample-data').removeClass('hidden');
@@ -271,12 +325,25 @@
             });
         });
 
+        // Collect active repeater groups (non-null, non-broken-apart).
+        const activeRepeaters = repeaterGroups.filter(function (g) { return g !== null; }).map(function (rg) {
+            return {
+                name:         rg.name,
+                label:        rg.label,
+                category:     rg.category,
+                subFields:    rg.subFields,
+                maxRows:      rg.maxRows,
+                fieldIndices: rg.fieldIndices,
+            };
+        });
+
         $.ajax({
             url: ctajData.ajaxUrl + '?action=ctaj_generate_json&nonce=' + encodeURIComponent(ctajData.nonce),
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
                 fields:        fields,
+                repeaters:     activeRepeaters,
                 groupTitle:    $('#ctaj-group-title').val(),
                 useTabs:       $('#ctaj-use-tabs').is(':checked'),
                 locationParam: $('#ctaj-location-param').val(),
