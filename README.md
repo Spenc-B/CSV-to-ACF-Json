@@ -11,6 +11,7 @@ Instead of manually clicking through ACF's UI to create dozens of fields, upload
 - **3-step wizard**: Upload → Configure → Download
 - **Smart category/tab detection**: If your CSV has a category row (row 1) spanning multiple columns, the plugin generates ACF Tab fields to group related fields
 - **Auto-detect field types**: Guesses field types from column names and sample data (e.g. `website` → URL, `email` → Email, `is_active` → True/False)
+- **Choice options from data**: When a column has 2–15 unique values, auto-detects it as a Select field with choices pre-populated. Choices are editable — add, remove, or switch to radio/checkbox
 - **Full field type support**: All ACF field types with correct default properties
 - **Interactive configuration**: Rename labels, change types, toggle required, add instructions, include/exclude fields
 - **Bulk actions**: Apply a field type to all fields at once, or reset to auto-detected types
