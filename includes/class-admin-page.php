@@ -287,6 +287,13 @@ class CTAJ_Admin_Page {
             $resolved_categories[ $i ] = $last_cat;
         }
 
+        // Collect ALL data rows (not just sample) for unique value extraction.
+        if ( $has_category_row && count( $lines ) >= 2 ) {
+            $all_data_rows = array_slice( $lines, 2 );
+        } else {
+            $all_data_rows = array_slice( $lines, 1 );
+        }
+
         // Build fields array.
         $fields = [];
         foreach ( $field_names as $i => $name ) {
@@ -294,13 +301,25 @@ class CTAJ_Admin_Page {
             if ( $name === '' ) {
                 continue;
             }
+
+            $unique_values = self::extract_unique_values( $i, $all_data_rows );
+            $guessed_type  = self::guess_field_type( $name, $i, $sample_data );
+
+            // If there are a small number of unique non-empty values, suggest select.
+            $choices = [];
+            if ( count( $unique_values ) >= 2 && count( $unique_values ) <= 15 && ! in_array( $guessed_type, [ 'url', 'email', 'image', 'file', 'wysiwyg', 'textarea', 'date_picker', 'color_picker', 'google_map' ], true ) ) {
+                $guessed_type = 'select';
+                $choices      = $unique_values;
+            }
+
             $fields[] = [
                 'index'    => $i,
                 'name'     => sanitize_title( str_replace( ' ', '_', $name ) ),
                 'label'    => self::name_to_label( $name ),
                 'raw_name' => sanitize_text_field( $name ),
                 'category' => isset( $resolved_categories[ $i ] ) ? sanitize_text_field( $resolved_categories[ $i ] ) : '',
-                'type'     => self::guess_field_type( $name, $i, $sample_data ),
+                'type'     => $guessed_type,
+                'choices'  => array_map( 'sanitize_text_field', $choices ),
             ];
         }
 
@@ -359,6 +378,15 @@ class CTAJ_Admin_Page {
             if ( empty( $f['include'] ) ) {
                 continue;
             }
+            $choices_raw = isset( $f['choices'] ) && is_array( $f['choices'] ) ? $f['choices'] : [];
+            $choices = [];
+            foreach ( $choices_raw as $c ) {
+                $c = sanitize_text_field( $c );
+                if ( $c !== '' ) {
+                    $choices[ $c ] = $c;
+                }
+            }
+
             $config['fields'][] = [
                 'name'         => sanitize_title( str_replace( ' ', '_', $f['name'] ) ),
                 'label'        => sanitize_text_field( $f['label'] ),
@@ -366,6 +394,7 @@ class CTAJ_Admin_Page {
                 'required'     => ! empty( $f['required'] ) ? 1 : 0,
                 'instructions' => sanitize_textarea_field( $f['instructions'] ?? '' ),
                 'category'     => sanitize_text_field( $f['category'] ?? '' ),
+                'choices'      => $choices,
             ];
         }
 
@@ -463,6 +492,22 @@ class CTAJ_Admin_Page {
         }
 
         return 'text';
+    }
+
+    /**
+     * Extract unique non-empty values for a column across all data rows.
+     */
+    private static function extract_unique_values( $col_index, $all_data_rows ) {
+        $values = [];
+        foreach ( $all_data_rows as $row ) {
+            if ( isset( $row[ $col_index ] ) ) {
+                $v = trim( $row[ $col_index ] );
+                if ( $v !== '' ) {
+                    $values[ $v ] = true;
+                }
+            }
+        }
+        return array_keys( $values );
     }
 
     private static function name_to_label( $name ) {

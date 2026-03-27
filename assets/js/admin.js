@@ -143,6 +143,64 @@
                 '<td class="ctaj-col-actions"><input type="checkbox" class="ctaj-field-include" checked /></td>'
             );
             $body.append($row);
+
+            // Choices sub-row (shown for choice-type fields with detected options).
+            const choices = field.choices || [];
+            const isChoiceType = ['select', 'checkbox', 'radio', 'button_group'].indexOf(field.type) !== -1;
+            const $choicesRow = $('<tr>').addClass('ctaj-choices-row').attr('data-parent', i);
+            if (!isChoiceType || choices.length === 0) {
+                $choicesRow.addClass('hidden');
+            }
+            $choicesRow.append(
+                '<td></td><td colspan="7">' +
+                '<div class="ctaj-choices-wrap">' +
+                '<label class="ctaj-choices-label">Choices:</label>' +
+                '<div class="ctaj-choices-tags" data-index="' + i + '">' +
+                choices.map(function (c) {
+                    return '<span class="ctaj-choice-tag">' + escHtml(c) +
+                        '<button type="button" class="ctaj-choice-remove" title="Remove">&times;</button></span>';
+                }).join('') +
+                '</div>' +
+                '<input type="text" class="ctaj-choice-add-input" placeholder="Add choice…" />' +
+                '<button type="button" class="button button-small ctaj-choice-add-btn">+</button>' +
+                '</div></td>'
+            );
+            $body.append($choicesRow);
+        });
+
+        // Toggle choices row when field type changes.
+        $body.on('change', '.ctaj-field-type', function () {
+            const $tr = $(this).closest('tr');
+            const idx = $tr.data('index');
+            const type = $(this).val();
+            const isChoice = ['select', 'checkbox', 'radio', 'button_group'].indexOf(type) !== -1;
+            $body.find('.ctaj-choices-row[data-parent="' + idx + '"]').toggleClass('hidden', !isChoice);
+        });
+
+        // Remove a choice tag.
+        $body.on('click', '.ctaj-choice-remove', function () {
+            $(this).closest('.ctaj-choice-tag').remove();
+        });
+
+        // Add a choice tag.
+        $body.on('click', '.ctaj-choice-add-btn', function () {
+            const $input = $(this).siblings('.ctaj-choice-add-input');
+            const val = $input.val().trim();
+            if (!val) return;
+            const $tags = $(this).siblings('.ctaj-choices-tags');
+            $tags.append(
+                '<span class="ctaj-choice-tag">' + escHtml(val) +
+                '<button type="button" class="ctaj-choice-remove" title="Remove">&times;</button></span>'
+            );
+            $input.val('').focus();
+        });
+
+        // Allow Enter key to add choice.
+        $body.on('keydown', '.ctaj-choice-add-input', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                $(this).siblings('.ctaj-choice-add-btn').trigger('click');
+            }
         });
 
         // Sample data table.
@@ -189,16 +247,27 @@
         const $btn = $(this).prop('disabled', true).text('Generating…');
 
         const fields = [];
-        $('#ctaj-fields-body tr').each(function () {
-            const i = parseInt($(this).data('index'), 10);
+        $('#ctaj-fields-body tr[data-index]').each(function () {
+            const $tr = $(this);
+            const i = parseInt($tr.data('index'), 10);
+
+            // Collect choices from the sub-row tags.
+            const choices = [];
+            $tr.next('.ctaj-choices-row').find('.ctaj-choice-tag').each(function () {
+                // Get text content excluding the × button.
+                const text = $(this).clone().children().remove().end().text().trim();
+                if (text) choices.push(text);
+            });
+
             fields.push({
                 name:         parsedFields[i].name,
-                label:        $(this).find('.ctaj-field-label').val(),
-                type:         $(this).find('.ctaj-field-type').val(),
-                required:     $(this).find('.ctaj-field-required').is(':checked'),
-                instructions: $(this).find('.ctaj-field-instructions').val(),
+                label:        $tr.find('.ctaj-field-label').val(),
+                type:         $tr.find('.ctaj-field-type').val(),
+                required:     $tr.find('.ctaj-field-required').is(':checked'),
+                instructions: $tr.find('.ctaj-field-instructions').val(),
                 category:     parsedFields[i].category,
-                include:      $(this).find('.ctaj-field-include').is(':checked'),
+                include:      $tr.find('.ctaj-field-include').is(':checked'),
+                choices:      choices,
             });
         });
 

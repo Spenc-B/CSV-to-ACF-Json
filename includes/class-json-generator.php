@@ -87,6 +87,11 @@ class CTAJ_JSON_Generator {
         // Add type-specific defaults.
         $acf_field = array_merge( $acf_field, $this->type_defaults( $field['type'] ) );
 
+        // Override choices if provided.
+        if ( ! empty( $field['choices'] ) && in_array( $field['type'], [ 'select', 'checkbox', 'radio', 'button_group' ], true ) ) {
+            $acf_field['choices'] = $field['choices'];
+        }
+
         return $acf_field;
     }
 
