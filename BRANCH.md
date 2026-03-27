@@ -1,16 +1,18 @@
-# Feature: Choice Options from Sample Data
+# Feature: Direct Import to ACF
 
 ## Why
-When a CSV column only contains a small set of unique values (e.g. 3-8 distinct entries), it's almost certainly a Select, Radio, or Checkbox field. Currently the plugin detects the *type* but leaves the choices empty — the user has to manually add them in ACF after import.
+Currently the workflow requires downloading the JSON file, then going to ACF > Tools > Import and uploading it again. This is an unnecessary extra step when ACF is already installed on the same site.
 
 ## What This Branch Will Do
-- During CSV parsing, collect all unique values per column from the data rows
-- If a column has a small number of unique values (default threshold: 15), auto-suggest it as a Select/Radio field and pre-populate the choices
-- Show detected choices in the Step 2 configuration table with the ability to edit/remove them
-- Pass choices through to the JSON generator so they appear in the exported ACF field definition
+- Detect whether ACF (Free or Pro) is active on the site
+- Add an "Import Directly to ACF" button alongside Download/Copy on Step 3
+- Use ACF's internal API (`acf_import_field_group()`) to register the field group directly into the database
+- Show success/failure feedback with a link to the newly created field group in ACF
+- If ACF is not active, the button is hidden and only Download/Copy are available
 
 ## Acceptance Criteria
-- [x] Unique values extracted during upload and returned to the JS
-- [x] Fields with few unique values auto-set to `select` type with choices pre-filled
-- [x] Choices editable in the configure step (add/remove/reorder)
-- [x] Generated JSON includes `choices` array for select/radio/checkbox fields
+- [ ] ACF availability detected and passed to the JS via `wp_localize_script`
+- [ ] "Import to ACF" button appears only when ACF is active
+- [ ] Clicking the button calls an AJAX handler that imports the field group via ACF API
+- [ ] Success message includes a direct edit link to the new field group
+- [ ] Error handling for duplicate group keys or import failures

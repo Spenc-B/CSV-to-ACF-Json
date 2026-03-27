@@ -325,6 +325,51 @@
         });
     });
 
+    // ----- Step 3: Import directly to ACF -----
+
+    // Show the import button only when ACF is active.
+    if (ctajData.acfActive) {
+        // Show it whenever Step 3 becomes visible.
+        const origGoToStep = goToStep;
+        goToStep = function (step) {
+            origGoToStep(step);
+            if (step === 3) {
+                $('#ctaj-import-acf').show();
+            }
+        };
+    }
+
+    $('#ctaj-import-acf').on('click', function () {
+        if (!generatedJson) return;
+
+        const $btn = $(this).prop('disabled', true).text('Importing…');
+        const $status = $('#ctaj-import-status').removeClass('hidden ctaj-error ctaj-success').addClass('ctaj-loading').text('Importing field group into ACF…');
+
+        // The generated JSON is an array with one field group.
+        const fieldGroup = Array.isArray(generatedJson) ? generatedJson[0] : generatedJson;
+
+        $.ajax({
+            url: ctajData.ajaxUrl + '?action=ctaj_import_to_acf&nonce=' + encodeURIComponent(ctajData.nonce),
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ fieldGroup: fieldGroup }),
+            success: function (res) {
+                $btn.prop('disabled', false).text('Import Directly to ACF');
+                if (res.success) {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-success').html(
+                        res.data.message + ' <a href="' + escHtml(res.data.editUrl) + '" target="_blank">Edit field group &rarr;</a>'
+                    );
+                } else {
+                    $status.removeClass('ctaj-loading').addClass('ctaj-error').text(res.data.message || 'Import failed.');
+                }
+            },
+            error: function () {
+                $btn.prop('disabled', false).text('Import Directly to ACF');
+                $status.removeClass('ctaj-loading').addClass('ctaj-error').text('Network error. Please try again.');
+            }
+        });
+    });
+
     // ----- Helpers -----
 
     function escHtml(str) {

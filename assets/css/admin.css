@@ -434,3 +434,15 @@
     line-height: 1.6;
     font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
+
+/* ----- Import to ACF ----- */
+
+#ctaj-import-acf {
+    margin-left: 8px;
+}
+
+#ctaj-import-status a {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+}
