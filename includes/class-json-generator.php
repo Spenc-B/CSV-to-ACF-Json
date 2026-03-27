@@ -22,20 +22,66 @@ class CTAJ_JSON_Generator {
     public function generate( array $config ) {
         $group_key = 'group_' . substr( md5( $config['group_title'] . wp_generate_password( 8, false ) ), 0, 13 );
 
+        // Build set of field indices consumed by repeaters.
+        $repeater_indices = [];
+        $repeaters        = $config['repeaters'] ?? [];
+        foreach ( $repeaters as $rg ) {
+            foreach ( $rg['field_indices'] as $idx ) {
+                $repeater_indices[ $idx ] = true;
+            }
+        }
+
+        // Index repeaters by category for insertion.
+        $repeaters_by_cat = [];
+        foreach ( $repeaters as $rg ) {
+            $cat = $rg['category'] ?? '';
+            $repeaters_by_cat[ $cat ][] = $rg;
+        }
+        $emitted_repeaters = [];
+
         $acf_fields  = [];
         $current_tab = '';
         $field_order = 0;
 
-        foreach ( $config['fields'] as $field ) {
+        foreach ( $config['fields'] as $i => $field ) {
+            // Skip fields consumed by a repeater.
+            if ( isset( $repeater_indices[ $i ] ) ) {
+                continue;
+            }
+
             // Insert tab field if category changed and tabs are enabled.
             if ( $config['use_tabs'] && ! empty( $field['category'] ) && $field['category'] !== $current_tab ) {
                 $current_tab  = $field['category'];
                 $acf_fields[] = $this->make_tab_field( $current_tab, $group_key, $field_order );
                 $field_order++;
+
+                // Emit any repeaters belonging to this category.
+                if ( isset( $repeaters_by_cat[ $current_tab ] ) ) {
+                    foreach ( $repeaters_by_cat[ $current_tab ] as $rg ) {
+                        $rg_id = $rg['name'];
+                        if ( isset( $emitted_repeaters[ $rg_id ] ) ) {
+                            continue;
+                        }
+                        $acf_fields[] = $this->make_repeater_field( $rg, $group_key, $field_order );
+                        $field_order++;
+                        $emitted_repeaters[ $rg_id ] = true;
+                    }
+                }
             }
 
             $acf_fields[] = $this->make_field( $field, $group_key, $field_order );
             $field_order++;
+        }
+
+        // Emit any remaining repeaters not yet emitted (e.g. no category).
+        foreach ( $repeaters as $rg ) {
+            $rg_id = $rg['name'];
+            if ( isset( $emitted_repeaters[ $rg_id ] ) ) {
+                continue;
+            }
+            $acf_fields[] = $this->make_repeater_field( $rg, $group_key, $field_order );
+            $field_order++;
+            $emitted_repeaters[ $rg_id ] = true;
         }
 
         $group = [
@@ -114,6 +160,61 @@ class CTAJ_JSON_Generator {
             ],
             'placement'         => 'top',
             'endpoint'          => 0,
+        ];
+    }
+
+    /**
+     * Build an ACF Repeater field with sub_fields.
+     */
+    private function make_repeater_field( array $repeater, $group_key, $order ) {
+        $field_key = 'field_' . substr( md5( $group_key . $repeater['name'] . $order ), 0, 13 );
+
+        $sub_fields = [];
+        $sub_order  = 0;
+        foreach ( $repeater['sub_fields'] as $sf ) {
+            $sf_key = 'field_' . substr( md5( $field_key . $sf['name'] . $sub_order ), 0, 13 );
+            $acf_sub = [
+                'key'               => $sf_key,
+                'label'             => $sf['label'],
+                'name'              => $sf['name'],
+                'aria-label'        => '',
+                'type'              => $sf['type'],
+                'instructions'      => '',
+                'required'          => 0,
+                'conditional_logic' => 0,
+                'wrapper'           => [
+                    'width' => '',
+                    'class' => '',
+                    'id'    => '',
+                ],
+            ];
+            $acf_sub = array_merge( $acf_sub, $this->type_defaults( $sf['type'] ) );
+            $sub_fields[] = $acf_sub;
+            $sub_order++;
+        }
+
+        return [
+            'key'               => $field_key,
+            'label'             => $repeater['label'],
+            'name'              => $repeater['name'],
+            'aria-label'        => '',
+            'type'              => 'repeater',
+            'instructions'      => '',
+            'required'          => 0,
+            'conditional_logic' => 0,
+            'wrapper'           => [
+                'width' => '',
+                'class' => '',
+                'id'    => '',
+            ],
+            'layout'            => 'table',
+            'pagination'        => 0,
+            'min'               => 0,
+            'max'               => $repeater['max_rows'] > 0 ? $repeater['max_rows'] : 0,
+            'collapsed'         => '',
+            'button_label'      => 'Add Row',
+            'rows_per_page'     => 20,
+            'sub_fields'        => $sub_fields,
         ];
     }
 

@@ -447,6 +447,54 @@
     text-decoration: underline;
 }
 
+/* ----- Repeater detection ----- */
+
+.ctaj-repeater-notice {
+    background: #f0f6fc;
+    border: 1px solid #2271b1;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+
+.ctaj-repeater-notice h3 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+}
+
+.ctaj-repeater-group {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+
+.ctaj-repeater-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ctaj-repeater-icon {
+    font-size: 16px;
+}
+
+.ctaj-repeater-meta {
+    color: #646970;
+    font-size: 13px;
+}
+
+.ctaj-repeater-break {
+    margin-left: auto !important;
+}
+
+/* Hide flat fields that are part of a repeater */
+tr.ctaj-in-repeater {
+    display: none;
+}
+
 /* ----- Mode toggle ----- */
 
 .ctaj-mode-toggle {

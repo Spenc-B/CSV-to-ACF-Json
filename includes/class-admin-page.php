@@ -180,6 +180,13 @@ class CTAJ_Admin_Page {
                     <button type="button" class="button" id="ctaj-auto-detect"><?php esc_html_e( 'Auto-Detect Types', 'csv-to-acf-json' ); ?></button>
                 </div>
 
+                <!-- Repeater detection notice -->
+                <div id="ctaj-repeater-notice" class="ctaj-repeater-notice hidden">
+                    <h3>🔁 <?php esc_html_e( 'Repeater Fields Detected', 'csv-to-acf-json' ); ?></h3>
+                    <p class="ctaj-description"><?php esc_html_e( 'Numbered column patterns were detected and grouped into Repeater fields. Click "Break Apart" to convert back to flat fields.', 'csv-to-acf-json' ); ?></p>
+                    <div id="ctaj-repeater-groups"></div>
+                </div>
+
                 <div id="ctaj-fields-table-wrap">
                     <table class="wp-list-table widefat fixed striped" id="ctaj-fields-table">
                         <thead>
@@ -400,6 +407,9 @@ class CTAJ_Admin_Page {
             ];
         }
 
+        // Detect repeater patterns (e.g. prefix_1_suffix, prefix_2_suffix).
+        $repeater_groups = self::detect_repeater_patterns( $fields );
+
         // Filter sample data to only include columns that have fields.
         $field_indices = array_column( $fields, 'index' );
         $filtered_sample = [];
@@ -419,9 +429,10 @@ class CTAJ_Admin_Page {
         ], HOUR_IN_SECONDS );
 
         wp_send_json_success( [
-            'sessionKey' => $session_key,
-            'fields'     => $fields,
-            'sampleData' => $filtered_sample,
+            'sessionKey'      => $session_key,
+            'fields'          => $fields,
+            'sampleData'      => $filtered_sample,
+            'repeaterGroups'  => $repeater_groups,
         ] );
     }
 
@@ -449,6 +460,7 @@ class CTAJ_Admin_Page {
             'location_op'    => isset( $input['locationOp'] ) ? sanitize_text_field( $input['locationOp'] ) : '==',
             'location_value' => isset( $input['locationValue'] ) ? sanitize_text_field( $input['locationValue'] ) : 'post',
             'fields'         => [],
+            'repeaters'      => [],
         ];
 
         foreach ( $input['fields'] as $f ) {
@@ -473,6 +485,30 @@ class CTAJ_Admin_Page {
                 'category'     => sanitize_text_field( $f['category'] ?? '' ),
                 'choices'      => $choices,
             ];
+        }
+
+        // Parse repeater groups.
+        if ( ! empty( $input['repeaters'] ) && is_array( $input['repeaters'] ) ) {
+            foreach ( $input['repeaters'] as $rg ) {
+                $sub_fields = [];
+                if ( ! empty( $rg['subFields'] ) && is_array( $rg['subFields'] ) ) {
+                    foreach ( $rg['subFields'] as $sf ) {
+                        $sub_fields[] = [
+                            'name'  => sanitize_title( $sf['name'] ?? 'value' ),
+                            'label' => sanitize_text_field( $sf['label'] ?? 'Value' ),
+                            'type'  => sanitize_text_field( $sf['type'] ?? 'text' ),
+                        ];
+                    }
+                }
+                $config['repeaters'][] = [
+                    'name'         => sanitize_title( $rg['name'] ?? '' ),
+                    'label'        => sanitize_text_field( $rg['label'] ?? '' ),
+                    'category'     => sanitize_text_field( $rg['category'] ?? '' ),
+                    'sub_fields'   => $sub_fields,
+                    'max_rows'     => intval( $rg['maxRows'] ?? 0 ),
+                    'field_indices' => array_map( 'intval', $rg['fieldIndices'] ?? [] ),
+                ];
+            }
         }
 
         $generator = new CTAJ_JSON_Generator();
@@ -807,6 +843,94 @@ class CTAJ_Admin_Page {
             }
         }
         return array_keys( $values );
+    }
+
+    /**
+     * Detect repeater patterns from numbered column names.
+     *
+     * Patterns detected:
+     *   prefix_1_suffix, prefix_2_suffix  → Repeater "prefix" with sub-field "suffix"
+     *   prefix_1, prefix_2               → Repeater "prefix" with one sub-field "value"
+     *   prefix_suffix_1, prefix_suffix_2  → Repeater "prefix_suffix" with one sub-field "value"
+     *
+     * Returns array of repeater groups, each with:
+     *   name, label, fieldIndices (indices into $fields), subFields, maxRows
+     */
+    private static function detect_repeater_patterns( $fields ) {
+        // Map each field to its numbered segments.
+        $candidates = [];
+        foreach ( $fields as $idx => $field ) {
+            $name = $field['name'];
+            // Match pattern: (prefix)_(number)_(suffix) or (prefix)_(number)
+            if ( preg_match( '/^(.+?)_(\d+)(?:_(.+))?$/', $name, $m ) ) {
+                $prefix = $m[1];
+                $num    = (int) $m[2];
+                $suffix = isset( $m[3] ) && $m[3] !== '' ? $m[3] : '_value';
+                $candidates[] = [
+                    'fieldIndex' => $idx,
+                    'prefix'     => $prefix,
+                    'number'     => $num,
+                    'suffix'     => $suffix,
+                ];
+            }
+        }
+
+        // Group by prefix.
+        $by_prefix = [];
+        foreach ( $candidates as $c ) {
+            $by_prefix[ $c['prefix'] ][] = $c;
+        }
+
+        $repeater_groups = [];
+
+        foreach ( $by_prefix as $prefix => $items ) {
+            // Need at least 2 items with different numbers to form a repeater.
+            $numbers = array_unique( array_column( $items, 'number' ) );
+            if ( count( $numbers ) < 2 ) {
+                continue;
+            }
+
+            // Determine unique suffixes (sub-fields).
+            $suffixes = array_unique( array_column( $items, 'suffix' ) );
+            $max_rows = max( $numbers );
+
+            // Build sub-fields list. Use the first occurrence to get type/category info.
+            $sub_fields = [];
+            foreach ( $suffixes as $suffix ) {
+                // Find first field with this suffix.
+                $first = null;
+                foreach ( $items as $item ) {
+                    if ( $item['suffix'] === $suffix ) {
+                        $first = $fields[ $item['fieldIndex'] ];
+                        break;
+                    }
+                }
+                $sub_name = $suffix === '_value' ? 'value' : $suffix;
+                $sub_fields[] = [
+                    'name'  => sanitize_title( $sub_name ),
+                    'label' => self::name_to_label( $sub_name ),
+                    'type'  => $first ? $first['type'] : 'text',
+                ];
+            }
+
+            $field_indices = array_column( $items, 'fieldIndex' );
+            sort( $field_indices );
+
+            // Use category from the first field in the group.
+            $first_field = $fields[ $field_indices[0] ];
+
+            $repeater_groups[] = [
+                'prefix'       => $prefix,
+                'name'         => sanitize_title( $prefix ),
+                'label'        => self::name_to_label( $prefix ),
+                'category'     => $first_field['category'] ?? '',
+                'fieldIndices' => $field_indices,
+                'subFields'    => $sub_fields,
+                'maxRows'      => $max_rows,
+            ];
+        }
+
+        return $repeater_groups;
     }
 
     private static function name_to_label( $name ) {
